@@ -1,5 +1,5 @@
-import {showDeprecationWarnings, refreshTokens, dev} from './dev.js'
-import {startDevServer} from '../utilities/theme-environment/theme-environment.js'
+import {showDeprecationWarnings, refreshTokens, dev, DevOptions} from './dev.js'
+import {setupDevServer} from '../utilities/theme-environment/theme-environment.js'
 import {mountThemeFileSystem} from '../utilities/theme-fs.js'
 import {fakeThemeFileSystem} from '../utilities/theme-fs/theme-fs-mock-factory.js'
 import {describe, expect, test, vi} from 'vitest'
@@ -16,7 +16,7 @@ vi.mock('../utilities/theme-fs.js')
 
 describe('dev', () => {
   const adminSession = {storeFqdn: 'my-store.myshopify.com', token: 'my-token'}
-  const options = {
+  const options: DevOptions = {
     adminSession,
     storefrontToken: 'my-storefront-token',
     directory: 'my-directory',
@@ -28,6 +28,7 @@ describe('dev', () => {
     password: 'my-token',
     'theme-editor-sync': false,
     'dev-preview': false,
+    'live-reload': 'hot-reload',
   }
   const localThemeFileSystem = fakeThemeFileSystem('tmp', new Map())
 
@@ -36,20 +37,26 @@ describe('dev', () => {
       // Given
       vi.mocked(fetchChecksums).mockResolvedValue([])
       vi.mocked(mountThemeFileSystem).mockResolvedValue(localThemeFileSystem)
-      vi.mocked(startDevServer).mockResolvedValue()
+      vi.mocked(setupDevServer).mockResolvedValue()
       const devOptions = {...options, 'dev-preview': true, 'theme-editor-sync': true}
 
       // When
       await dev(devOptions)
 
       // Then
-      expect(startDevServer).toHaveBeenCalledWith(
+      expect(setupDevServer).toHaveBeenCalledWith(
         options.theme,
         {
           session: {...adminSession, storefrontToken: 'my-storefront-token', expiresAt: expect.any(Date)},
           remoteChecksums: [],
           localThemeFileSystem,
-          themeEditorSync: true,
+          options: {
+            host: '127.0.0.1',
+            liveReload: 'hot-reload',
+            open: false,
+            port: '9292',
+            themeEditorSync: true,
+          },
         },
         expect.any(Function),
       )

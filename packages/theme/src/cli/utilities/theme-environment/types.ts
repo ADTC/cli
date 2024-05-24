@@ -48,10 +48,35 @@ export interface DevServerContext {
   localThemeFileSystem: ThemeFileSystem
 
   /**
-   * Indicates if theme editor changes are periodically pulled to the local
-   * theme.
+   * Options for the development server.
    */
-  themeEditorSync: boolean
+  options?: {
+    /**
+     * Indicates if theme editor changes are periodically pulled to the local
+     * theme.
+     */
+    themeEditorSync: boolean
+
+    /**
+     * Network interface to bind the development server to.
+     */
+    host?: string
+
+    /**
+     * Port to bind the development server to.
+     */
+    port?: string
+
+    /**
+     * Mode for live reload behavior. Options: ['hot-reload', 'full-page', 'off']
+     */
+    liveReload?: string
+
+    /**
+     * Automatically open the theme preview in the default browser.
+     */
+    open?: boolean
+  }
 }
 
 /**

@@ -1,4 +1,4 @@
-import {startDevServer} from './theme-environment.js'
+import {setupDevServer} from './theme-environment.js'
 import {reconcileAndPollThemeEditorChanges} from './remote-theme-watcher.js'
 import {DevServerContext} from './types.js'
 import {uploadTheme} from '../theme-uploader.js'
@@ -20,7 +20,9 @@ describe('startDevServer', () => {
     session: {storefrontToken: '', token: '', storeFqdn: '', expiresAt: new Date()},
     remoteChecksums: [],
     localThemeFileSystem,
-    themeEditorSync: false,
+    options: {
+      themeEditorSync: false,
+    },
   }
 
   test('should upload the development theme to remote if themeEditorSync is false', async () => {
@@ -28,7 +30,7 @@ describe('startDevServer', () => {
     const context = defaultServerContext
 
     // When
-    await startDevServer(developmentTheme, context, () => {})
+    await setupDevServer(developmentTheme, context, () => {})
 
     // Then
     expect(uploadTheme).toHaveBeenCalled()
@@ -36,10 +38,15 @@ describe('startDevServer', () => {
 
   test('should initialize theme editor sync if themeEditorSync flag is passed', async () => {
     // Given
-    const context = {...defaultServerContext, themeEditorSync: true}
+    const context: DevServerContext = {
+      ...defaultServerContext,
+      options: {
+        themeEditorSync: true,
+      },
+    }
 
     // When
-    await startDevServer(developmentTheme, context, () => {})
+    await setupDevServer(developmentTheme, context, () => {})
 
     // Then
     expect(reconcileAndPollThemeEditorChanges).toHaveBeenCalled()
