@@ -1,4 +1,5 @@
 import {LogsContextOptions, ensureLogsContext} from './context.js'
+import {renderLogs} from './app-logs/ui.js'
 import {ExtensionSpecification} from '../models/extensions/specification.js'
 import {DeveloperPlatformClient, selectDeveloperPlatformClient} from '../utilities/developer-platform-client.js'
 import {loadAppConfiguration} from '../models/app/loader.js'
@@ -57,7 +58,11 @@ export async function logs(commandOptions: LogsOptions) {
     return
   }
 
-  await startPolling(jwt.jwtToken, '', pollProcess)
+  await renderLogs({
+    logsProcess: pollProcess,
+    cursor: '',
+    jwtToken: jwt.jwtToken,
+  })
 }
 
 async function prepareForLogs(commandOptions: LogsOptions): Promise<LogsConfig> {
@@ -83,7 +88,6 @@ async function prepareForLogs(commandOptions: LogsOptions): Promise<LogsConfig> 
 }
 
 const subscribeProcess = async ({logsConfig}: {logsConfig: LogsConfig}) => {
-  // Subscribe to logs and return the JWT token
   const appLogsSubscribeVariables = {
     shopIds: [logsConfig.storeId],
     apiKey: logsConfig.apiKey,
@@ -105,7 +109,7 @@ const subscribeProcess = async ({logsConfig}: {logsConfig: LogsConfig}) => {
   return {jwtToken}
 }
 
-const pollProcess = async ({
+export const pollProcess = async ({
   jwtToken,
   cursor,
 }: {
@@ -114,6 +118,7 @@ const pollProcess = async ({
 }): Promise<{
   cursor?: string
   errors?: string[]
+  appLogs?: AppEventData[]
 }> => {
   const url = await generateFetchAppLogUrl(cursor)
   const response = await fetch(url, {
@@ -157,13 +162,14 @@ const pollProcess = async ({
     errors?: string[]
   }
 
-  console.log(data.app_logs)
-
   return {
     cursor: data.cursor,
+    errors: data.errors,
+    appLogs: data.app_logs,
   }
 }
 
+// For Testing
 const startPolling = async (
   jwtToken: string,
   cursor: string,
