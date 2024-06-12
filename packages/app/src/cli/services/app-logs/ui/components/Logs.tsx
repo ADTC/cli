@@ -37,16 +37,22 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
   const pollingInterval = useRef<NodeJS.Timeout>()
   const [logs, setLogs] = useState<DetailsFunctionRunLogEvent[]>([])
   const [errors, setErrors] = useState<string[]>([])
-  const [status, setStatus] = useState<string>('')
+  const [currentInterval, setCurrentInterval] = useState<number>(POLLING_INTERVAL_MS)
+  const [jwtTokenState, setJwtTokenState] = useState<string>(jwtToken)
 
   const pollLogs = async (currentCursor: string) => {
     try {
-      const {cursor: newCursor, errors, appLogs} = await logsProcess({jwtToken, cursor: currentCursor})
+      const {cursor: newCursor, errors, appLogs} = await logsProcess({jwtToken: jwtTokenState, cursor: currentCursor})
       if (errors) {
         setErrors(errors)
-        setStatus('error')
-        return
+        setCurrentInterval(POLLING_BACKOFF_INTERVAL_MS)
       }
+
+      if (newCursor) {
+        setErrors([])
+        setCurrentInterval(POLLING_INTERVAL_MS)
+      }
+
       if (appLogs) {
         for (const log of appLogs) {
           const payload = JSON.parse(log.payload)
@@ -67,15 +73,11 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
           }
           setLogs((logs) => [...logs, logEvent])
         }
-        // for (const log of appLogs) {
-        //   setLogs((logs) => [...logs, log])
-        // }
       }
-      setStatus('success')
-      pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), POLLING_INTERVAL_MS)
+      pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), currentInterval)
     } catch (error) {
-      setErrors(['ERROR'])
-      setStatus('error')
+      setErrors(['There was an issue polling for logs. Please try again.'])
+      setCurrentInterval(POLLING_BACKOFF_INTERVAL_MS)
       throw error
     }
   }
@@ -85,6 +87,7 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
 
     return () => {
       if (pollingInterval.current) {
+        console.log('clearn timeout called')
         clearTimeout(pollingInterval.current)
       }
     }
@@ -109,6 +112,15 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
           </Box>
         )}
       </Static>
+      <Box>{errors.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box>
+      <Box flexDirection="column">
+        {errors.length > 0 &&
+          errors.map((error, index) => (
+            <Text key={index} color="red">
+              {error}
+            </Text>
+          ))}
+      </Box>
     </>
   )
 }

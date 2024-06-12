@@ -131,29 +131,21 @@ export const pollProcess = async ({
   if (!response.ok) {
     const responseText = await response.text()
     if (response.status === 401) {
-      // await resubscribeCallback()
+      return {
+        errors: ['Resubscribing to app logs polling.'],
+      }
     } else if (response.status === 429 || response.status >= 500) {
-      // stdout.write(`Received an error while polling for app logs.`)
-      // stdout.write(`${response.status}: ${response.statusText}`)
-      // stdout.write(responseText)
-      // stdout.write(`Retrying in ${POLLING_BACKOFF_INTERVAL_MS / 1000} seconds`)
-      // setTimeout(() => {
-      //   pollAppLogs({
-      //     stdout,
-      //     appLogsFetchInput: {
-      //       jwtToken,
-      //       cursor: undefined,
-      //     },
-      //     apiKey,
-      //     resubscribeCallback,
-      //   }).catch((error) => {
-      //     outputDebug(`Unexpected error during polling: ${error}}\n`)
-      //   })
-      // }, POLLING_BACKOFF_INTERVAL_MS)
+      return {
+        errors: [
+          `Received an error while polling for app logs.`,
+          `${response.status}: ${response.statusText}`,
+          `Retrying in ${POLLING_BACKOFF_INTERVAL_MS / 1000} seconds`,
+        ],
+      }
     } else {
       throw new Error(`Error while fetching: ${responseText}`)
+      return {errors: [responseText]}
     }
-    return {errors: [responseText]}
   }
 
   const data = (await response.json()) as {
