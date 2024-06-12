@@ -35,9 +35,7 @@ export interface LogsOptions {
 
 interface LogsConfig {
   developerPlatformClient: DeveloperPlatformClient
-  storeFqdn: string
   storeId: string
-  commandOptions: LogsOptions
   apiKey: string
 }
 
@@ -60,6 +58,9 @@ export async function logs(commandOptions: LogsOptions) {
 
   await renderLogs({
     logsProcess: pollProcess,
+    developerPlatformClient: logsConfig.developerPlatformClient,
+    storeId: logsConfig.storeId,
+    apiKey: logsConfig.apiKey,
     cursor: '',
     jwtToken: jwt.jwtToken,
   })
@@ -79,15 +80,13 @@ async function prepareForLogs(commandOptions: LogsOptions): Promise<LogsConfig> 
   const apiKey = remoteApp.apiKey
 
   return {
-    storeFqdn,
     storeId,
     developerPlatformClient,
-    commandOptions,
     apiKey,
   }
 }
 
-const subscribeProcess = async ({logsConfig}: {logsConfig: LogsConfig}) => {
+export const subscribeProcess = async ({logsConfig}: {logsConfig: LogsConfig}) => {
   const appLogsSubscribeVariables = {
     shopIds: [logsConfig.storeId],
     apiKey: logsConfig.apiKey,

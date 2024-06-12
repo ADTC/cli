@@ -1,4 +1,5 @@
-import {AppEventData} from '../../../../services/logs.js'
+import {AppEventData, subscribeProcess} from '../../../../services/logs.js'
+import {DeveloperPlatformClient} from '../../../../utilities/developer-platform-client.js'
 import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
@@ -9,6 +10,9 @@ export interface LogsProps {
     errors?: string[] | undefined
     appLogs?: AppEventData[] | undefined
   }>
+  developerPlatformClient: DeveloperPlatformClient
+  storeId: string
+  apiKey: string
   cursor: string
   jwtToken: string
 }
@@ -21,7 +25,7 @@ interface DetailsFunctionRunLogEvent {
   outputBytes: number
   logs: string
   functionId: string
-  fuelConsumed: number
+  fuelConsumed: string
   errorMessage: string | null
   errorType: string | null
   status: string
@@ -33,29 +37,61 @@ const POLLING_INTERVAL_MS = 450
 const POLLING_BACKOFF_INTERVAL_MS = 10000
 const ONE_MILLION = 1000000
 
-const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => {
+const Logs: FunctionComponent<LogsProps> = ({
+  logsProcess,
+  cursor,
+  jwtToken,
+  developerPlatformClient,
+  storeId,
+  apiKey,
+}) => {
   const pollingInterval = useRef<NodeJS.Timeout>()
+  const currentIntervalRef = useRef<number>(POLLING_INTERVAL_MS)
   const [logs, setLogs] = useState<DetailsFunctionRunLogEvent[]>([])
-  const [errors, setErrors] = useState<string[]>([])
-  const [currentInterval, setCurrentInterval] = useState<number>(POLLING_INTERVAL_MS)
-  const [jwtTokenState, setJwtTokenState] = useState<string>(jwtToken)
+  const [errorsState, setErrorsState] = useState<string[]>([])
+  const [jwtTokenState, setJwtTokenState] = useState<string | null>(jwtToken)
 
   const pollLogs = async (currentCursor: string) => {
     try {
-      const {cursor: newCursor, errors, appLogs} = await logsProcess({jwtToken: jwtTokenState, cursor: currentCursor})
+      if (jwtTokenState === null) {
+        // Resubscribe here if needed
+        const jwtToken = await subscribeProcess({
+          logsConfig: {
+            developerPlatformClient,
+            storeId,
+            apiKey,
+          },
+        })
+        if (!jwtToken) {
+          return
+        }
+        setJwtTokenState(jwtToken.jwtToken)
+      }
+      const {
+        cursor: newCursor,
+        errors,
+        appLogs,
+      } = await logsProcess({jwtToken: jwtTokenState || jwtToken, cursor: currentCursor})
       if (errors) {
-        setErrors(errors)
-        setCurrentInterval(POLLING_BACKOFF_INTERVAL_MS)
+        setErrorsState(errors)
+        const needsToResubscribe = errors.some((error) => error.includes('401'))
+        if (needsToResubscribe) {
+          setJwtTokenState(null)
+          return
+        }
+
+        currentIntervalRef.current = POLLING_BACKOFF_INTERVAL_MS
       }
 
       if (newCursor) {
-        setErrors([])
-        setCurrentInterval(POLLING_INTERVAL_MS)
+        setErrorsState([])
+        currentIntervalRef.current = POLLING_INTERVAL_MS
       }
 
       if (appLogs) {
         for (const log of appLogs) {
           const payload = JSON.parse(log.payload)
+          const fuel = (payload.fuel_consumed / ONE_MILLION).toFixed(4)
           const logEvent: DetailsFunctionRunLogEvent = {
             input: payload.input,
             inputBytes: payload.input_bytes,
@@ -64,7 +100,7 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
             logs: payload.logs,
             invocationId: payload.invocation_id,
             functionId: payload.function_id,
-            fuelConsumed: payload.fuel_consumed,
+            fuelConsumed: fuel,
             errorMessage: payload.error_message,
             errorType: payload.error_type,
             status: log.status,
@@ -74,10 +110,9 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
           setLogs((logs) => [...logs, logEvent])
         }
       }
-      pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), currentInterval)
+      pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), currentIntervalRef.current)
     } catch (error) {
-      setErrors(['There was an issue polling for logs. Please try again.'])
-      setCurrentInterval(POLLING_BACKOFF_INTERVAL_MS)
+      setErrorsState(['There was an issue polling for logs. Please try again.'])
       throw error
     }
   }
@@ -87,7 +122,6 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
 
     return () => {
       if (pollingInterval.current) {
-        console.log('clearn timeout called')
         clearTimeout(pollingInterval.current)
       }
     }
@@ -104,7 +138,7 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
               <Text color="blueBright">{`${log.source}`}</Text>
               <Text color={log.status === 'Success' ? 'green' : 'red'}>{`${log.status}`}</Text>
               <Text> {`${log.functionId}`}</Text>
-              <Text>in {log.fuelConsumed}M instructions</Text>
+              <Text>in {log.fuelConsumed} M instructions</Text>
             </Box>
             <Text>{log.logs}</Text>
             <Text>Input ({log.inputBytes} bytes):</Text>
@@ -112,10 +146,10 @@ const Logs: FunctionComponent<LogsProps> = ({logsProcess, cursor, jwtToken}) => 
           </Box>
         )}
       </Static>
-      <Box>{errors.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box>
+      <Box>{errorsState.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box>
       <Box flexDirection="column">
-        {errors.length > 0 &&
-          errors.map((error, index) => (
+        {errorsState.length > 0 &&
+          errorsState.map((error, index) => (
             <Text key={index} color="red">
               {error}
             </Text>
