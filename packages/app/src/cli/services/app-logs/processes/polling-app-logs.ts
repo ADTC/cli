@@ -1,54 +1,7 @@
-import {DeveloperPlatformClient} from '../../../utilities/developer-platform-client.js'
 import {outputWarn, outputDebug} from '@shopify/cli-kit/node/output'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
 import {AbortError} from '@shopify/cli-kit/node/error'
-
-export interface AppLogData {
-  shop_id: number
-  api_client_id: number
-  payload: string
-  log_type: string
-  source: string
-  source_namespace: string
-  cursor: string
-  status: 'success' | 'failure'
-  log_timestamp: string
-}
-
-export interface DetailsFunctionRunLogEvent {
-  input: string
-  inputBytes: number
-  invocationId: string
-  output: unknown
-  outputBytes: number
-  logs: string
-  functionId: string
-  fuelConsumed: number
-  errorMessage: string | null
-  errorType: string | null
-}
-
-export function parseFunctionRunPayload(payload: string): DetailsFunctionRunLogEvent {
-  const parsedPayload = JSON.parse(payload)
-  return {
-    input: parsedPayload.input,
-    inputBytes: parsedPayload.input_bytes,
-    output: parsedPayload.output,
-    outputBytes: parsedPayload.output_bytes,
-    logs: parsedPayload.logs,
-    invocationId: parsedPayload.invocation_id,
-    functionId: parsedPayload.function_id,
-    fuelConsumed: parsedPayload.fuel_consumed,
-    errorMessage: parsedPayload.error_message,
-    errorType: parsedPayload.error_type,
-  }
-}
-
-export interface SubscribeOptions {
-  developerPlatformClient: DeveloperPlatformClient
-  storeId: string
-  apiKey: string
-}
+import {SubscribeOptions, PollOptions, AppLogData} from '../types.js'
 
 export const subscribeProcess = async ({storeId, apiKey, developerPlatformClient}: SubscribeOptions) => {
   const appLogsSubscribeVariables = {
@@ -70,23 +23,6 @@ export const subscribeProcess = async ({storeId, apiKey, developerPlatformClient
   }
   return jwtToken
 }
-
-export interface PollOptions {
-  jwtToken: string
-  cursor?: string
-  filters?: {
-    status?: string
-    source?: string
-  }
-}
-
-interface PollResponse {
-  cursor?: string
-  errors?: string[]
-  appLogs?: AppLogData[]
-}
-
-export type LogsProcess = (pollOptions: PollOptions) => Promise<PollResponse>
 
 export const pollProcess = async ({
   jwtToken,

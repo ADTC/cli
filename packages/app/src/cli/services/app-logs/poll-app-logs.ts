@@ -1,5 +1,5 @@
 import {writeAppLogsToFile} from './write-app-logs.js'
-import {AppLogData} from './processes/polling-app-logs.js'
+import {AppLogData} from './types.js'
 import {useConcurrentOutputContext} from '@shopify/cli-kit/node/ui/components'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
 import {fetch} from '@shopify/cli-kit/node/http'

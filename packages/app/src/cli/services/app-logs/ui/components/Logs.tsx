@@ -1,11 +1,11 @@
+import {subscribeProcess} from '../../processes/polling-app-logs.js'
 import {
-  subscribeProcess,
   SubscribeOptions,
   PollOptions,
   LogsProcess,
   DetailsFunctionRunLogEvent,
-  parseFunctionRunPayload,
-} from '../../processes/polling-app-logs.js'
+} from '../../types.js'
+import {parseFunctionRunPayload, currentTime, prettyPrintJsonIfPossible} from '../../helpers.js'
 import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
@@ -161,29 +161,4 @@ const Logs: FunctionComponent<LogsProps> = ({
 
 export {Logs}
 
-function currentTime() {
-  const currentDateTime = new Date()
-  const year = currentDateTime.getFullYear()
-  const month = addLeadingZero(currentDateTime.getMonth() + 1)
-  const day = addLeadingZero(currentDateTime.getDate())
-  const hours = addLeadingZero(currentDateTime.getHours())
-  const minutes = addLeadingZero(currentDateTime.getMinutes())
-  const seconds = addLeadingZero(currentDateTime.getSeconds())
-  const milliseconds = addLeadingZero(currentDateTime.getMilliseconds(), 3)
 
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
-}
-
-function addLeadingZero(number: number, length = 2) {
-  return number.toString().padStart(length, '0')
-}
-
-function prettyPrintJsonIfPossible(jsonString: unknown) {
-  try {
-    const jsonObject = JSON.parse(jsonString as string)
-    return JSON.stringify(jsonObject, null, 2)
-  } catch (error) {
-    return jsonString
-    throw new Error(`Failed to parse JSON: ${error}`)
-  }
-}
