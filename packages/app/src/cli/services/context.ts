@@ -50,14 +50,6 @@ export const InvalidApiKeyErrorMessage = (apiKey: string) => {
   }
 }
 
-export interface LogsContextOptions {
-  directory: string
-  apiKey?: string
-  storeFqdn?: string
-  reset: boolean
-  developerPlatformClient: DeveloperPlatformClient
-}
-
 export interface DevContextOptions {
   directory: string
   apiKey?: string

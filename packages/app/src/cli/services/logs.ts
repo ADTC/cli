@@ -25,11 +25,7 @@ export async function logs(commandOptions: LogsOptions) {
     developerPlatformClient: logsConfig.developerPlatformClient,
   }
 
-  const data = await subscribeProcess(subscribeOptions)
-
-  if (!data?.jwtToken) {
-    return
-  }
+  const jwtToken = await subscribeProcess(subscribeOptions)
 
   const filters = {
     status: commandOptions.status,
@@ -37,7 +33,7 @@ export async function logs(commandOptions: LogsOptions) {
   }
 
   const pollOptions = {
-    jwtToken: data.jwtToken,
+    jwtToken,
     filters,
   }
 

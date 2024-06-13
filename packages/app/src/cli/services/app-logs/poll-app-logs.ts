@@ -1,4 +1,5 @@
 import {writeAppLogsToFile} from './write-app-logs.js'
+import {AppLogData} from './processes/polling-app-logs.js'
 import {useConcurrentOutputContext} from '@shopify/cli-kit/node/ui/components'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
 import {fetch} from '@shopify/cli-kit/node/http'
@@ -15,18 +16,6 @@ const generateFetchAppLogUrl = async (cursor?: string) => {
   const fqdn = await partnersFqdn()
   const url = `https://${fqdn}/app_logs/poll`
   return url + (cursor ? `?cursor=${cursor}` : '')
-}
-
-export interface AppLogData {
-  shop_id: number
-  api_client_id: number
-  payload: string
-  log_type: string
-  source: string
-  source_namespace: string
-  cursor: string
-  status: 'success' | 'failure'
-  log_timestamp: string
 }
 
 export const pollAppLogs = async ({

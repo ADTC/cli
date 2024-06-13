@@ -1,13 +1,13 @@
-import {ExtensionSpecification} from '../../../models/extensions/specification.js'
 import {DeveloperPlatformClient} from '../../../utilities/developer-platform-client.js'
 import {outputWarn, outputDebug} from '@shopify/cli-kit/node/output'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
+import {AbortError} from '@shopify/cli-kit/node/error'
 
-export interface AppEventData {
+export interface AppLogData {
   shop_id: number
   api_client_id: number
   payload: string
-  event_type: string
+  log_type: string
   source: string
   source_namespace: string
   cursor: string
@@ -15,40 +15,39 @@ export interface AppEventData {
   log_timestamp: string
 }
 
-export interface AppEventData {
-  shop_id: number
-  api_client_id: number
-  payload: string
-  event_type: string
-  source: string
-  source_namespace: string
-  cursor: string
-  status: 'success' | 'failure'
-  log_timestamp: string
+export interface DetailsFunctionRunLogEvent {
+  input: string
+  inputBytes: number
+  invocationId: string
+  output: unknown
+  outputBytes: number
+  logs: string
+  functionId: string
+  fuelConsumed: number
+  errorMessage: string | null
+  errorType: string | null
 }
 
-export interface LogsOptions {
-  apiKey?: string
-  storeFqdn?: string
-  path?: string
-  source?: string
-  status?: string
-  configName?: string
-  directory: string
-  userProvidedConfigName?: string
-  specifications?: ExtensionSpecification[]
-  remoteFlags?: Flag[]
-  reset: boolean
+export function parseFunctionRunPayload(payload: string): DetailsFunctionRunLogEvent {
+  const parsedPayload = JSON.parse(payload)
+  return {
+    input: parsedPayload.input,
+    inputBytes: parsedPayload.input_bytes,
+    output: parsedPayload.output,
+    outputBytes: parsedPayload.output_bytes,
+    logs: parsedPayload.logs,
+    invocationId: parsedPayload.invocation_id,
+    functionId: parsedPayload.function_id,
+    fuelConsumed: parsedPayload.fuel_consumed,
+    errorMessage: parsedPayload.error_message,
+    errorType: parsedPayload.error_type,
+  }
 }
 
 export interface SubscribeOptions {
   developerPlatformClient: DeveloperPlatformClient
   storeId: string
   apiKey: string
-}
-
-enum Flag {
-  DeclarativeWebhooks,
 }
 
 export const subscribeProcess = async ({storeId, apiKey, developerPlatformClient}: SubscribeOptions) => {
@@ -64,12 +63,12 @@ export const subscribeProcess = async ({storeId, apiKey, developerPlatformClient
   if (errors && errors.length > 0) {
     outputWarn(`Errors subscribing to app logs: ${errors.join(', ')}`)
     outputWarn('App log streaming is not available in this `log` session.')
-    return
+    throw new AbortError(errors.join(', '))
   } else {
     outputDebug(`Subscribed to App Events for shop ID(s) ${appLogsSubscribeVariables.shopIds}`)
     outputDebug(`Success: ${success}\n`)
   }
-  return {jwtToken}
+  return jwtToken
 }
 
 export interface PollOptions {
@@ -84,7 +83,7 @@ export interface PollOptions {
 interface PollResponse {
   cursor?: string
   errors?: string[]
-  appLogs?: AppEventData[]
+  appLogs?: AppLogData[]
 }
 
 export type LogsProcess = (pollOptions: PollOptions) => Promise<PollResponse>
@@ -96,7 +95,7 @@ export const pollProcess = async ({
 }: PollOptions): Promise<{
   cursor?: string
   errors?: string[]
-  appLogs?: AppEventData[]
+  appLogs?: AppLogData[]
 }> => {
   const url = await generateFetchAppLogUrl(cursor, filters)
   const response = await fetch(url, {
@@ -117,12 +116,12 @@ export const pollProcess = async ({
         errors: [`${response.status}: ${response.statusText}`],
       }
     } else {
-      throw new Error(`Error while fetching: ${responseText}`)
+      throw new AbortError(`Error while fetching: ${responseText}`)
     }
   }
 
   const data = (await response.json()) as {
-    app_logs?: AppEventData[]
+    app_logs?: AppLogData[]
     cursor?: string
     errors?: string[]
   }

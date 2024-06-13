@@ -1,4 +1,11 @@
-import {subscribeProcess, SubscribeOptions, PollOptions, LogsProcess} from '../../processes/polling-app-logs.js'
+import {
+  subscribeProcess,
+  SubscribeOptions,
+  PollOptions,
+  LogsProcess,
+  DetailsFunctionRunLogEvent,
+  parseFunctionRunPayload,
+} from '../../processes/polling-app-logs.js'
 import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
@@ -9,20 +16,16 @@ export interface LogsProps {
   pollOptions: PollOptions
 }
 
-interface DetailsFunctionRunLogEvent {
-  input: string
-  inputBytes: number
-  invocationId: string
-  output: string
-  outputBytes: number
-  logs: string
-  functionId: string
-  fuelConsumed: string
-  errorMessage: string | null
-  errorType: string | null
+interface AppLogPrefix {
   status: string
   source: string
-  eventType?: string
+  fuelConsumed: string
+  functionId: string
+}
+
+interface ProcessOutout {
+  prefix: AppLogPrefix
+  appLog: DetailsFunctionRunLogEvent
 }
 
 const POLLING_INTERVAL_MS = 450
@@ -37,7 +40,7 @@ const Logs: FunctionComponent<LogsProps> = ({
 }) => {
   const pollingInterval = useRef<NodeJS.Timeout>()
   const currentIntervalRef = useRef<number>(POLLING_INTERVAL_MS)
-  const [logs, setLogs] = useState<DetailsFunctionRunLogEvent[]>([])
+  const [processOutputs, setProcessOutputs] = useState<ProcessOutout[]>([])
   const [errorsState, setErrorsState] = useState<string[]>([])
   const [jwtTokenState, setJwtTokenState] = useState<string | null>(jwtToken)
 
@@ -52,7 +55,7 @@ const Logs: FunctionComponent<LogsProps> = ({
         if (!jwtToken) {
           return
         }
-        setJwtTokenState(jwtToken.jwtToken)
+        setJwtTokenState(jwtToken)
       }
       const {
         cursor: newCursor,
@@ -65,38 +68,32 @@ const Logs: FunctionComponent<LogsProps> = ({
           setErrorsState([...errors, `Retrying in ${POLLING_THROTTLE_RETRY_INTERVAL_MS / 1000} seconds.`])
         } else if (errors.some((error) => error.includes('401'))) {
           setJwtTokenState(null)
-          setErrorsState([...errors, 'Resubscribing to logs.'])
         } else {
           currentIntervalRef.current = POLLING_ERROR_RETRY_INTERVAL_MS
           setErrorsState([...errors, `Retrying in ${POLLING_ERROR_RETRY_INTERVAL_MS / 1000} seconds.`])
         }
-      }
-
-      if (newCursor) {
+      } else {
         setErrorsState([])
         currentIntervalRef.current = POLLING_INTERVAL_MS
       }
 
       if (appLogs) {
         for (const log of appLogs) {
-          const payload = JSON.parse(log.payload)
-          const fuel = (payload.fuel_consumed / ONE_MILLION).toFixed(4)
-          const logEvent: DetailsFunctionRunLogEvent = {
-            input: payload.input,
-            inputBytes: payload.input_bytes,
-            output: payload.output,
-            outputBytes: payload.output_bytes,
-            logs: payload.logs,
-            invocationId: payload.invocation_id,
-            functionId: payload.function_id,
-            fuelConsumed: fuel,
-            errorMessage: payload.error_message,
-            errorType: payload.error_type,
-            status: log.status,
+          const appLog = parseFunctionRunPayload(log.payload)
+          const fuel = (appLog.fuelConsumed / ONE_MILLION).toFixed(4)
+          const prefix = {
+            status: log.status === 'success' ? 'Success' : 'Failure',
             source: log.source,
-            eventType: log.event_type,
+            fuelConsumed: fuel,
+            functionId: appLog.functionId,
           }
-          setLogs((logs) => [...logs, logEvent])
+          setProcessOutputs((prev) => [
+            ...prev,
+            {
+              prefix,
+              appLog,
+            },
+          ])
         }
       }
       pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), currentIntervalRef.current)
@@ -118,24 +115,38 @@ const Logs: FunctionComponent<LogsProps> = ({
 
   return (
     <>
-      <Static items={logs}>
-        {(log: DetailsFunctionRunLogEvent, index: number) => (
+      <Static items={processOutputs}>
+        {(
+          {
+            appLog,
+            prefix,
+          }: {
+            appLog: DetailsFunctionRunLogEvent
+            prefix: AppLogPrefix
+          },
+          index: number,
+        ) => (
           <Box flexDirection="column" key={index}>
             {/* update: use invocationId after https://github.com/Shopify/shopify-functions/issues/235 */}
             <Box flexDirection="row" gap={0.5}>
               <Text color="green">{currentTime()} </Text>
-              <Text color="blueBright">{`${log.source}`}</Text>
-              <Text color={log.status === 'Success' ? 'green' : 'red'}>{`${log.status}`}</Text>
-              <Text> {`${log.functionId}`}</Text>
-              <Text>in {log.fuelConsumed} M instructions</Text>
+              <Text color="blueBright">{`${prefix.source}`}</Text>
+              <Text color={prefix.status === 'Success' ? 'green' : 'red'}>{`${prefix.status}`}</Text>
+              <Text> {`${prefix.functionId}`}</Text>
+              <Text>in {prefix.fuelConsumed} M instructions</Text>
             </Box>
-            <Text>{log.logs}</Text>
-            <Text>Input ({log.inputBytes} bytes):</Text>
-            <Text>{prettyPrintJson(log.input)}</Text>
+            <Text>{appLog.logs}</Text>
+            <Text>Input ({appLog.inputBytes} bytes):</Text>
+            <Text>{prettyPrintJsonIfPossible(appLog.input)}</Text>
+            {appLog.output && (
+              <>
+                <Text>Output ({appLog.outputBytes} bytes):</Text>
+                <Text>{prettyPrintJsonIfPossible(appLog.output)}</Text>
+              </>
+            )}
           </Box>
         )}
       </Static>
-      {/* <Box>{errorsState.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box> */}
       <Box flexDirection="column">
         {errorsState.length > 0 &&
           errorsState.map((error, index) => (
@@ -167,11 +178,12 @@ function addLeadingZero(number: number, length = 2) {
   return number.toString().padStart(length, '0')
 }
 
-function prettyPrintJson(jsonString: string) {
+function prettyPrintJsonIfPossible(jsonString: unknown) {
   try {
-    const jsonObject = JSON.parse(jsonString)
+    const jsonObject = JSON.parse(jsonString as string)
     return JSON.stringify(jsonObject, null, 2)
   } catch (error) {
+    return jsonString
     throw new Error(`Failed to parse JSON: ${error}`)
   }
 }
