@@ -1,35 +1,12 @@
-import {AppEventData, subscribeProcess} from '../../../../services/logs.js'
-import {DeveloperPlatformClient} from '../../../../utilities/developer-platform-client.js'
+import {subscribeProcess, SubscribeOptions, PollOptions, LogsProcess} from '../../processes/polling-app-logs.js'
 import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
 
 export interface LogsProps {
-  logsProcess: ({
-    jwtToken,
-    cursor,
-    filters,
-  }: {
-    jwtToken: string
-    cursor?: string | undefined
-    filters?: {
-      status?: string
-      source?: string
-    }
-  }) => Promise<{
-    cursor?: string | undefined
-    errors?: string[] | undefined
-    appLogs?: AppEventData[] | undefined
-  }>
-  developerPlatformClient: DeveloperPlatformClient
-  storeId: string
-  apiKey: string
-  cursor: string
-  jwtToken: string
-  filters?: {
-    status?: string
-    source?: string
-  }
+  logsProcess: LogsProcess
+  subscribeOptions: SubscribeOptions
+  pollOptions: PollOptions
 }
 
 interface DetailsFunctionRunLogEvent {
@@ -55,12 +32,8 @@ const ONE_MILLION = 1000000
 
 const Logs: FunctionComponent<LogsProps> = ({
   logsProcess,
-  filters,
-  cursor,
-  jwtToken,
-  developerPlatformClient,
-  storeId,
-  apiKey,
+  pollOptions: {cursor = '', jwtToken, filters},
+  subscribeOptions: {developerPlatformClient, storeId, apiKey},
 }) => {
   const pollingInterval = useRef<NodeJS.Timeout>()
   const currentIntervalRef = useRef<number>(POLLING_INTERVAL_MS)
@@ -71,13 +44,10 @@ const Logs: FunctionComponent<LogsProps> = ({
   const pollLogs = async (currentCursor: string) => {
     try {
       if (jwtTokenState === null) {
-        // Resubscribe here if needed
         const jwtToken = await subscribeProcess({
-          logsConfig: {
-            developerPlatformClient,
-            storeId,
-            apiKey,
-          },
+          developerPlatformClient,
+          storeId,
+          apiKey,
         })
         if (!jwtToken) {
           return

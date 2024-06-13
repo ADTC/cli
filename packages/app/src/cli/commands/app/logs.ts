@@ -77,12 +77,11 @@ export default class Logs extends Command {
     const logOptions = {
       apiKey,
       json: flags.json,
-      path: flags.path,
+      directory: flags.path,
       storeFqdn: flags.store,
       source: flags.source,
       status: flags.status,
       configName: flags.config,
-      directory: flags.path,
       reset: flags.reset,
     }
 
