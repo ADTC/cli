@@ -268,7 +268,7 @@ export async function checkForNewVersion(
   const cacheKey: PackageVersionKey = `npm-package-${dependency}`
   let lastVersion
   try {
-    lastVersion = await cacheRetrieveOrRepopulate(cacheKey, getLatestVersion, cacheExpiryInHours * 24 * 1000)
+    lastVersion = await cacheRetrieveOrRepopulate(cacheKey, getLatestVersion, cacheExpiryInHours * 3600 * 1000)
     // eslint-disable-next-line no-catch-all/no-catch-all
   } catch (error) {
     return undefined
