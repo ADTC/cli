@@ -1,5 +1,7 @@
 import {DeveloperPlatformClient} from '../../utilities/developer-platform-client.js'
 
+export const LOG_TYPE_FUNCTION_RUN = 'function_run'
+
 export interface AppLogData {
   shop_id: number
   api_client_id: number
@@ -12,7 +14,7 @@ export interface AppLogData {
   log_timestamp: string
 }
 
-export interface DetailsFunctionRunLogEvent {
+export interface FunctionRunLog {
   input: string
   inputBytes: number
   invocationId: string

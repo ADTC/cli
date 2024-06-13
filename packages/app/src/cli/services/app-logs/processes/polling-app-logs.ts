@@ -1,7 +1,7 @@
+import {SubscribeOptions, PollOptions, AppLogData} from '../types.js'
 import {outputWarn, outputDebug} from '@shopify/cli-kit/node/output'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
 import {AbortError} from '@shopify/cli-kit/node/error'
-import {SubscribeOptions, PollOptions, AppLogData} from '../types.js'
 
 export const subscribeProcess = async ({storeId, apiKey, developerPlatformClient}: SubscribeOptions) => {
   const appLogsSubscribeVariables = {

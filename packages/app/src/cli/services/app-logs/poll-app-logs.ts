@@ -1,16 +1,16 @@
 import {writeAppLogsToFile} from './write-app-logs.js'
-import {AppLogData} from './types.js'
+import {AppLogData, LOG_TYPE_FUNCTION_RUN} from './types.js'
+import {
+  POLLING_INTERVAL_MS,
+  POLLING_ERROR_RETRY_INTERVAL_MS,
+  POLLING_THROTTLE_RETRY_INTERVAL_MS,
+  ONE_MILLION,
+} from './constants.js'
 import {useConcurrentOutputContext} from '@shopify/cli-kit/node/ui/components'
 import {partnersFqdn} from '@shopify/cli-kit/node/context/fqdn'
 import {fetch} from '@shopify/cli-kit/node/http'
 import {outputContent, outputDebug, outputToken, outputWarn} from '@shopify/cli-kit/node/output'
 import {Writable} from 'stream'
-
-const POLLING_INTERVAL_MS = 450
-const POLLING_ERROR_RETRY_INTERVAL_MS = 5 * 1000
-const POLLING_THROTTLE_RETRY_INTERVAL_MS = 60 * 1000
-const ONE_MILLION = 1000000
-const LOG_TYPE_FUNCTION_RUN = 'function_run'
 
 const generateFetchAppLogUrl = async (cursor?: string) => {
   const fqdn = await partnersFqdn()

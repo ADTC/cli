@@ -1,11 +1,12 @@
 import {subscribeProcess} from '../../processes/polling-app-logs.js'
-import {
-  SubscribeOptions,
-  PollOptions,
-  LogsProcess,
-  DetailsFunctionRunLogEvent,
-} from '../../types.js'
+import {SubscribeOptions, PollOptions, LogsProcess, FunctionRunLog} from '../../types.js'
 import {parseFunctionRunPayload, currentTime, prettyPrintJsonIfPossible} from '../../helpers.js'
+import {
+  POLLING_INTERVAL_MS,
+  POLLING_ERROR_RETRY_INTERVAL_MS,
+  POLLING_THROTTLE_RETRY_INTERVAL_MS,
+  ONE_MILLION,
+} from '../../constants.js'
 import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
@@ -25,13 +26,8 @@ interface AppLogPrefix {
 
 interface ProcessOutout {
   prefix: AppLogPrefix
-  appLog: DetailsFunctionRunLogEvent
+  appLog: FunctionRunLog
 }
-
-const POLLING_INTERVAL_MS = 450
-const POLLING_ERROR_RETRY_INTERVAL_MS = 5 * 1000
-const POLLING_THROTTLE_RETRY_INTERVAL_MS = 60 * 1000
-const ONE_MILLION = 1000000
 
 const Logs: FunctionComponent<LogsProps> = ({
   logsProcess,
@@ -44,66 +40,70 @@ const Logs: FunctionComponent<LogsProps> = ({
   const [errorsState, setErrorsState] = useState<string[]>([])
   const [jwtTokenState, setJwtTokenState] = useState<string | null>(jwtToken)
 
-  const pollLogs = async (currentCursor: string) => {
-    try {
-      if (jwtTokenState === null) {
-        const jwtToken = await subscribeProcess({
-          developerPlatformClient,
-          storeId,
-          apiKey,
-        })
-        if (!jwtToken) {
-          return
-        }
-        setJwtTokenState(jwtToken)
-      }
-      const {
-        cursor: newCursor,
-        errors,
-        appLogs,
-      } = await logsProcess({jwtToken: jwtTokenState || jwtToken, cursor: currentCursor, filters})
-      if (errors) {
-        if (errors.some((error) => error.includes('429'))) {
-          currentIntervalRef.current = POLLING_THROTTLE_RETRY_INTERVAL_MS
-          setErrorsState([...errors, `Retrying in ${POLLING_THROTTLE_RETRY_INTERVAL_MS / 1000} seconds.`])
-        } else if (errors.some((error) => error.includes('401'))) {
-          setJwtTokenState(null)
-        } else {
-          currentIntervalRef.current = POLLING_ERROR_RETRY_INTERVAL_MS
-          setErrorsState([...errors, `Retrying in ${POLLING_ERROR_RETRY_INTERVAL_MS / 1000} seconds.`])
-        }
-      } else {
-        setErrorsState([])
-        currentIntervalRef.current = POLLING_INTERVAL_MS
-      }
-
-      if (appLogs) {
-        for (const log of appLogs) {
-          const appLog = parseFunctionRunPayload(log.payload)
-          const fuel = (appLog.fuelConsumed / ONE_MILLION).toFixed(4)
-          const prefix = {
-            status: log.status === 'success' ? 'Success' : 'Failure',
-            source: log.source,
-            fuelConsumed: fuel,
-            functionId: appLog.functionId,
-          }
-          setProcessOutputs((prev) => [
-            ...prev,
-            {
-              prefix,
-              appLog,
-            },
-          ])
-        }
-      }
-      pollingInterval.current = setTimeout(() => pollLogs(newCursor || currentCursor), currentIntervalRef.current)
-    } catch (error) {
-      setErrorsState(['There was an issue polling for logs. Please try again.'])
-      throw error
-    }
-  }
-
   useEffect(() => {
+    const pollLogs = async (currentCursor: string) => {
+      try {
+        if (jwtTokenState === null) {
+          const jwtToken = await subscribeProcess({
+            developerPlatformClient,
+            storeId,
+            apiKey,
+          })
+          if (!jwtToken) {
+            return
+          }
+          setJwtTokenState(jwtToken)
+        }
+        const {
+          cursor: newCursor,
+          errors,
+          appLogs,
+        } = await logsProcess({jwtToken: jwtTokenState || jwtToken, cursor: currentCursor, filters})
+        if (errors) {
+          if (errors.some((error) => error.includes('429'))) {
+            currentIntervalRef.current = POLLING_THROTTLE_RETRY_INTERVAL_MS
+            setErrorsState([...errors, `Retrying in ${POLLING_THROTTLE_RETRY_INTERVAL_MS / 1000} seconds.`])
+          } else if (errors.some((error) => error.includes('401'))) {
+            setJwtTokenState(null)
+          } else {
+            currentIntervalRef.current = POLLING_ERROR_RETRY_INTERVAL_MS
+            setErrorsState([...errors, `Retrying in ${POLLING_ERROR_RETRY_INTERVAL_MS / 1000} seconds.`])
+          }
+        } else {
+          setErrorsState([])
+          currentIntervalRef.current = POLLING_INTERVAL_MS
+        }
+
+        if (appLogs) {
+          for (const log of appLogs) {
+            const appLog = parseFunctionRunPayload(log.payload)
+            const fuel = (appLog.fuelConsumed / ONE_MILLION).toFixed(4)
+            const prefix = {
+              status: log.status === 'success' ? 'Success' : 'Failure',
+              source: log.source,
+              fuelConsumed: fuel,
+              functionId: appLog.functionId,
+            }
+            setProcessOutputs((prev) => [
+              ...prev,
+              {
+                prefix,
+                appLog,
+              },
+            ])
+          }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        pollingInterval.current = setTimeout(() => {
+          return pollLogs(newCursor || currentCursor)
+        }, currentIntervalRef.current)
+      } catch (error) {
+        setErrorsState(['There was an issue polling for logs. Please try again.'])
+        throw error
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     pollLogs(cursor)
 
     return () => {
@@ -121,7 +121,7 @@ const Logs: FunctionComponent<LogsProps> = ({
             appLog,
             prefix,
           }: {
-            appLog: DetailsFunctionRunLogEvent
+            appLog: FunctionRunLog
             prefix: AppLogPrefix
           },
           index: number,
@@ -160,5 +160,3 @@ const Logs: FunctionComponent<LogsProps> = ({
 }
 
 export {Logs}
-
-

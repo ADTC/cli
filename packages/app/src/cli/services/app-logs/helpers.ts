@@ -1,6 +1,6 @@
-import {DetailsFunctionRunLogEvent} from './types.js'
+import {FunctionRunLog} from './types.js'
 
-export function parseFunctionRunPayload(payload: string): DetailsFunctionRunLogEvent {
+export function parseFunctionRunPayload(payload: string): FunctionRunLog {
   const parsedPayload = JSON.parse(payload)
   return {
     input: parsedPayload.input,
@@ -28,8 +28,7 @@ export function currentTime() {
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
 }
-
-export function addLeadingZero(number: number, length = 2) {
+function addLeadingZero(number: number, length = 2) {
   return number.toString().padStart(length, '0')
 }
 
