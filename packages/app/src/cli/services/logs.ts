@@ -1,4 +1,4 @@
-import {LogsContextOptions, ensureLogsContext} from './context.js'
+import {DevContextOptions, ensureDevContext} from './context.js'
 import {renderLogs} from './app-logs/ui.js'
 import {pollProcess, subscribeProcess} from './app-logs/processes/polling-app-logs.js'
 import {selectDeveloperPlatformClient, DeveloperPlatformClient} from '../utilities/developer-platform-client.js'
@@ -58,8 +58,8 @@ async function prepareForLogs(commandOptions: LogsOptions): Promise<{
     userProvidedConfigName: commandOptions.configName,
   })
   let developerPlatformClient = selectDeveloperPlatformClient({configuration})
-  const devContextOptions: LogsContextOptions = {...commandOptions, developerPlatformClient}
-  const {storeId, remoteApp} = await ensureLogsContext(devContextOptions)
+  const devContextOptions: DevContextOptions = {...commandOptions, developerPlatformClient}
+  const {storeId, remoteApp} = await ensureDevContext(devContextOptions)
 
   developerPlatformClient = remoteApp.developerPlatformClient ?? developerPlatformClient
 
