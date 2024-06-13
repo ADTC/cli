@@ -43,10 +43,6 @@ export enum Flag {
   DeclarativeWebhooks,
 }
 
-const POLLING_INTERVAL_MS = 450
-const POLLING_BACKOFF_INTERVAL_MS = 10000
-const ONE_MILLION = 1000000
-
 export async function logs(commandOptions: LogsOptions) {
   const logsConfig = await prepareForLogs(commandOptions)
 
@@ -56,6 +52,11 @@ export async function logs(commandOptions: LogsOptions) {
     return
   }
 
+  const filters = {
+    status: commandOptions.status,
+    source: commandOptions.source,
+  }
+
   await renderLogs({
     logsProcess: pollProcess,
     developerPlatformClient: logsConfig.developerPlatformClient,
@@ -63,6 +64,7 @@ export async function logs(commandOptions: LogsOptions) {
     apiKey: logsConfig.apiKey,
     cursor: '',
     jwtToken: jwt.jwtToken,
+    filters,
   })
 }
 
@@ -73,7 +75,7 @@ async function prepareForLogs(commandOptions: LogsOptions): Promise<LogsConfig> 
   })
   let developerPlatformClient = selectDeveloperPlatformClient({configuration})
   const devContextOptions: LogsContextOptions = {...commandOptions, developerPlatformClient}
-  const {storeFqdn, storeId, remoteApp} = await ensureLogsContext(devContextOptions)
+  const {storeId, remoteApp} = await ensureLogsContext(devContextOptions)
 
   developerPlatformClient = remoteApp.developerPlatformClient ?? developerPlatformClient
 
@@ -98,28 +100,32 @@ export const subscribeProcess = async ({logsConfig}: {logsConfig: LogsConfig}) =
   outputDebug(`API Key: ${appLogsSubscribeVariables.apiKey}\n`)
   if (errors && errors.length > 0) {
     outputWarn(`Errors subscribing to app logs: ${errors.join(', ')}`)
-    outputWarn('App log streaming is not available in this `dev` session.')
+    outputWarn('App log streaming is not available in this `log` session.')
     return
   } else {
     outputDebug(`Subscribed to App Events for shop ID(s) ${appLogsSubscribeVariables.shopIds}`)
     outputDebug(`Success: ${success}\n`)
   }
-  outputWarn(`[Subscribe Token]: ${jwtToken}`)
   return {jwtToken}
 }
 
 export const pollProcess = async ({
   jwtToken,
   cursor,
+  filters,
 }: {
   jwtToken: string
   cursor?: string
+  filters?: {
+    status?: string
+    source?: string
+  }
 }): Promise<{
   cursor?: string
   errors?: string[]
   appLogs?: AppEventData[]
 }> => {
-  const url = await generateFetchAppLogUrl(cursor)
+  const url = await generateFetchAppLogUrl(cursor, filters)
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -131,19 +137,14 @@ export const pollProcess = async ({
     const responseText = await response.text()
     if (response.status === 401) {
       return {
-        errors: ['Resubscribing to app logs polling.'],
+        errors: [`${response.status}: ${response.statusText}`],
       }
     } else if (response.status === 429 || response.status >= 500) {
       return {
-        errors: [
-          `Received an error while polling for app logs.`,
-          `${response.status}: ${response.statusText}`,
-          `Retrying in ${POLLING_BACKOFF_INTERVAL_MS / 1000} seconds`,
-        ],
+        errors: [`${response.status}: ${response.statusText}`],
       }
     } else {
       throw new Error(`Error while fetching: ${responseText}`)
-      return {errors: [responseText]}
     }
   }
 
@@ -158,30 +159,6 @@ export const pollProcess = async ({
     errors: data.errors,
     appLogs: data.app_logs,
   }
-}
-
-// For Testing
-const startPolling = async (
-  jwtToken: string,
-  cursor: string,
-  process: ({jwtToken, cursor}: {jwtToken: string; cursor?: string | undefined}) => Promise<{
-    cursor?: string | undefined
-    errors?: string[] | undefined
-  }>,
-) => {
-  const poll = async ({jwtToken, cursor}: {jwtToken: string; cursor: string}) => {
-    const {cursor: newCursor, errors} = await process({jwtToken, cursor})
-    if (errors) {
-      // Handle errors
-      return
-    }
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    setTimeout(() => poll({jwtToken, cursor: newCursor || cursor}), POLLING_INTERVAL_MS)
-  }
-  await poll({
-    jwtToken,
-    cursor,
-  })
 }
 
 const generateFetchAppLogUrl = async (

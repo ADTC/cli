@@ -5,7 +5,18 @@ import React, {FunctionComponent, useRef, useState, useEffect} from 'react'
 import {Static, Box, Text} from '@shopify/cli-kit/node/ink'
 
 export interface LogsProps {
-  logsProcess: ({jwtToken, cursor}: {jwtToken: string; cursor?: string | undefined}) => Promise<{
+  logsProcess: ({
+    jwtToken,
+    cursor,
+    filters,
+  }: {
+    jwtToken: string
+    cursor?: string | undefined
+    filters?: {
+      status?: string
+      source?: string
+    }
+  }) => Promise<{
     cursor?: string | undefined
     errors?: string[] | undefined
     appLogs?: AppEventData[] | undefined
@@ -15,6 +26,10 @@ export interface LogsProps {
   apiKey: string
   cursor: string
   jwtToken: string
+  filters?: {
+    status?: string
+    source?: string
+  }
 }
 
 interface DetailsFunctionRunLogEvent {
@@ -34,11 +49,13 @@ interface DetailsFunctionRunLogEvent {
 }
 
 const POLLING_INTERVAL_MS = 450
-const POLLING_BACKOFF_INTERVAL_MS = 10000
+const POLLING_ERROR_RETRY_INTERVAL_MS = 5 * 1000
+const POLLING_THROTTLE_RETRY_INTERVAL_MS = 60 * 1000
 const ONE_MILLION = 1000000
 
 const Logs: FunctionComponent<LogsProps> = ({
   logsProcess,
+  filters,
   cursor,
   jwtToken,
   developerPlatformClient,
@@ -71,16 +88,18 @@ const Logs: FunctionComponent<LogsProps> = ({
         cursor: newCursor,
         errors,
         appLogs,
-      } = await logsProcess({jwtToken: jwtTokenState || jwtToken, cursor: currentCursor})
+      } = await logsProcess({jwtToken: jwtTokenState || jwtToken, cursor: currentCursor, filters})
       if (errors) {
-        setErrorsState(errors)
-        const needsToResubscribe = errors.some((error) => error.includes('401'))
-        if (needsToResubscribe) {
+        if (errors.some((error) => error.includes('429'))) {
+          currentIntervalRef.current = POLLING_THROTTLE_RETRY_INTERVAL_MS
+          setErrorsState([...errors, `Retrying in ${POLLING_THROTTLE_RETRY_INTERVAL_MS / 1000} seconds.`])
+        } else if (errors.some((error) => error.includes('401'))) {
           setJwtTokenState(null)
-          return
+          setErrorsState([...errors, 'Resubscribing to logs.'])
+        } else {
+          currentIntervalRef.current = POLLING_ERROR_RETRY_INTERVAL_MS
+          setErrorsState([...errors, `Retrying in ${POLLING_ERROR_RETRY_INTERVAL_MS / 1000} seconds.`])
         }
-
-        currentIntervalRef.current = POLLING_BACKOFF_INTERVAL_MS
       }
 
       if (newCursor) {
@@ -146,7 +165,7 @@ const Logs: FunctionComponent<LogsProps> = ({
           </Box>
         )}
       </Static>
-      <Box>{errorsState.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box>
+      {/* <Box>{errorsState.length === 0 && <Text color="blueBright">Polling for app logs</Text>}</Box> */}
       <Box flexDirection="column">
         {errorsState.length > 0 &&
           errorsState.map((error, index) => (
