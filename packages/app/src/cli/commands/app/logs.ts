@@ -19,11 +19,6 @@ export default class Logs extends Command {
 
   static flags = {
     ...Dev.flags,
-    json: Flags.boolean({
-      description: 'Print logs in JSON format.',
-      env: 'SHOPIFY_FLAG_JSON',
-      default: false,
-    }),
     source: Flags.string({
       description: 'Filters output to the specified log source (Multiple flags allowed).',
       env: 'SHOPIFY_FLAG_SOURCE',
@@ -42,7 +37,6 @@ export default class Logs extends Command {
     await checkFolderIsValidApp(flags.path)
     const logOptions = {
       apiKey,
-      json: flags.json,
       directory: flags.path,
       storeFqdn: flags.store,
       source: flags.source,

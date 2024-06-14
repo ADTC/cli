@@ -7,7 +7,6 @@ import {loadAppConfiguration} from '../models/app/loader.js'
 interface LogsOptions {
   directory: string
   reset: boolean
-  json: boolean
   apiKey?: string
   storeFqdn?: string
   source?: string

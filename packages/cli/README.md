@@ -15,6 +15,7 @@
 * [`shopify app import-extensions`](#shopify-app-import-extensions)
 * [`shopify app info`](#shopify-app-info)
 * [`shopify app init`](#shopify-app-init)
+* [`shopify app logs`](#shopify-app-logs)
 * [`shopify app:release --version <version>`](#shopify-apprelease---version-version)
 * [`shopify app versions list [FILE]`](#shopify-app-versions-list-file)
 * [`shopify app webhook trigger`](#shopify-app-webhook-trigger)
@@ -507,6 +508,54 @@ FLAGS
                                   - Any GitHub repo with optional branch and subpath, e.g.,
                                   https://github.com/Shopify/<repository>/[subpath]#[branch]
       --verbose                   Increase the verbosity of the output.
+```
+
+## `shopify app logs`
+
+Stream detailed logs for your Shopify app.
+
+```
+USAGE
+  $ shopify app logs [--checkout-cart-url <value>] [--client-id <value> | -c <value>] [--no-color]
+    [--no-update] [--notify <value>] [--path <value>] [--reset | ] [--skip-dependencies-installation] [--source <value>]
+    [--status <value>] [-s <value>] [--subscription-product-url <value>] [-t <value>] [--theme-app-extension-port
+    <value>] [--tunnel-url <value> |  | ] [--verbose]
+
+FLAGS
+  -c, --config=<value>                    The name of the app configuration.
+  -s, --store=<value>                     Store URL. Must be an existing development or Shopify Plus sandbox store.
+  -t, --theme=<value>                     Theme ID or name of the theme app extension host theme.
+      --checkout-cart-url=<value>         Resource URL for checkout UI extension. Format:
+                                          "/cart/{productVariantID}:{productQuantity}"
+      --client-id=<value>                 The Client ID of your app.
+      --no-color                          Disable color output.
+      --no-update                         Skips the Partners Dashboard URL update step.
+      --notify=<value>                    The file path or URL. The file path is to a file that you want updated on
+                                          idle. The URL path is where you want a webhook posted to report on file
+                                          changes.
+      --path=<value>                      The path to your app directory.
+      --reset                             Reset all your settings.
+      --skip-dependencies-installation    Skips the installation of dependencies. Deprecated, use workspaces instead.
+      --source=<value>                    Filters output to the specified log source (Multiple flags allowed).
+      --status=<value>                    Filters output to the specified status (success or failure).
+      --subscription-product-url=<value>  Resource URL for subscription UI extension. Format: "/products/{productId}"
+      --theme-app-extension-port=<value>  Local port of the theme app extension development server.
+      --tunnel-url=<value>                Use a custom tunnel, it must be running before executing dev. Format:
+                                          "https://my-tunnel-url:port".
+      --verbose                           Increase the verbosity of the output.
+
+DESCRIPTION
+  Stream detailed logs for your Shopify app.
+
+
+  Opens a real-time stream of detailed log events from the selected app and store. Use the `--source` argument to limit
+  output to a particular log source, such as a Shopify Function or webhook topic. Use the `sources` subcommand to list
+  available sources.
+  The `--json` argument can be used to receive log entries as line-delimited JSON (JSONL). By piping the output to tools
+  like `jq`, you can filter the output to specific information.
+  ```
+  shopify app logs --json
+  ```
 ```
 
 ## `shopify app:release --version <version>`
